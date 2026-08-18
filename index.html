@@ -37,12 +37,13 @@
 <div class="group"><div class="groupTitle">Datos</div>
 <button class="navbtn" onclick="exportData()">⬇ Exportar respaldo</button>
 <button class="navbtn" onclick="document.getElementById('importFile').click()">⬆ Importar respaldo</button>
+<button class="navbtn" onclick="refreshFromCloud()">↻ Sincronizar ahora</button>
 <input id="importFile" type="file" accept=".json" hidden onchange="importData(event)">
 </div>
 </aside>
 <main class="main">
 <section class="page active" id="dashboard">
-<div class="header"><div><h1>Dashboard</h1><div class="sub">Control de inventario de refacciones por equipo</div></div><div class="status">Estado: <span class="ok">● Disponible</span><div class="small muted">Datos guardados en este dispositivo</div></div></div>
+<div class="header"><div><h1>Dashboard</h1><div class="sub">Control de inventario de refacciones por equipo</div></div><div class="status">Estado: <span class="ok">● Disponible</span><div class="small muted" id="syncText">Conectando con Supabase…</div></div></div>
 <div class="grid4">
 <div class="kpi"><div>📦 Refacciones</div><div class="n" id="kTotalRefs">0</div><div class="muted">Registros totales</div></div>
 <div class="kpi"><div>🔩 Piezas</div><div class="n" id="kTotalPieces">0</div><div class="muted">Existencias totales</div></div>
@@ -83,49 +84,323 @@
 <button class="btn primary">Registrar</button></div></form></div></div>
 <div class="card"><div class="cardhead">Historial</div><div class="cardbody"><div class="tablewrap"><table><thead><tr><th>ID</th><th>Refacción</th><th>Tipo</th><th>Equipo</th><th>Cantidad</th><th>Fecha</th><th>Acciones</th></tr></thead><tbody id="movementBody"></tbody></table></div></div></div>
 </section>
-<div class="footerNote">Versión portable: no requiere Laragon, PHP, MySQL, Railway ni Render. Para compartir los mismos datos entre varios dispositivos se necesitaría una base de datos en línea.</div>
+<div class="footerNote">Versión en línea: no requiere Laragon, PHP, MySQL, Railway ni Render. El inventario y los movimientos se sincronizan mediante Supabase.</div>
 </main></div>
+
 <script>
+const SUPABASE_URL='https://mdrwistpblqrwczzukhf.supabase.co';
+const SUPABASE_KEY='sb_publishable_yxCAfanUClZRHU5QiDcGwg_7gfG6wo1';
+
 const EQUIPOS=['Tratamiento','Placas','Bandas Cargadoras','Bandas Collet','Etiquetadoras','Motor','Reductor','Plataformas'];
-let refs=JSON.parse(localStorage.getItem('erp_refs')||'[]');
-let movs=JSON.parse(localStorage.getItem('erp_movs')||'[]');
+let refs=[];
+let movs=[];
 let currentEquipment='';
-function persist(){localStorage.setItem('erp_refs',JSON.stringify(refs));localStorage.setItem('erp_movs',JSON.stringify(movs));}
+let loading=false;
+
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
-function init(){
- equipmentMenu.innerHTML=EQUIPOS.map(e=>`<button class="navbtn" onclick="showEquipment('${e.replaceAll("'","\\'")}')">⚙ ${e}</button>`).join('');
- [linea,movEquipo].forEach(s=>s.innerHTML='<option value="">Seleccione</option>'+EQUIPOS.map(e=>`<option>${e}</option>`).join(''));
- filterEquipment.innerHTML='<option value="">Todos los equipos</option>'+EQUIPOS.map(e=>`<option>${e}</option>`).join('');
- renderAll();
+
+async function api(path, options={}){
+  const headers={
+    'apikey':SUPABASE_KEY,
+    'Authorization':'Bearer '+SUPABASE_KEY,
+    'Content-Type':'application/json',
+    ...(options.headers||{})
+  };
+  const res=await fetch(SUPABASE_URL+'/rest/v1/'+path,{...options,headers});
+  if(!res.ok){
+    let msg='';
+    try{msg=await res.text()}catch(e){}
+    throw new Error(msg || ('Error '+res.status));
+  }
+  if(res.status===204) return null;
+  const text=await res.text();
+  return text ? JSON.parse(text) : null;
 }
+
+function setSync(ok,msg){
+  const el=document.getElementById('syncText');
+  if(el) el.textContent=msg;
+  const st=document.querySelector('.status .ok');
+  if(st){
+    st.textContent=ok?'● Sincronizado':'● Sin conexión';
+    st.style.color=ok?'var(--green)':'var(--red)';
+  }
+}
+
+async function loadRefs(){
+  const data=await api('refacciones?select=*&order=codigo.asc');
+  refs=(data||[]).map(r=>({...r,linea:r.equipo}));
+}
+
+async function loadMovs(){
+  const data=await api('movimientos?select=*&order=id.desc');
+  const refMap=Object.fromEntries(refs.map(r=>[String(r.id),r]));
+  movs=(data||[]).map(m=>{
+    const r=refMap[String(m.refaccion_id)]||{};
+    return {
+      ...m,
+      linea:m.equipo,
+      codigo:r.codigo||'',
+      nombre:r.nombre||'Refacción',
+      fecha:m.created_at ? new Date(m.created_at).toLocaleString('es-MX') : ''
+    };
+  });
+}
+
+async function refreshFromCloud(showMessage=false){
+  if(loading) return;
+  loading=true;
+  try{
+    setSync(true,'Sincronizando…');
+    await loadRefs();
+    await loadMovs();
+    renderAll();
+    setSync(true,'Datos sincronizados en línea');
+    if(showMessage) alert('Datos sincronizados correctamente.');
+    await offerLocalMigration();
+  }catch(e){
+    console.error(e);
+    setSync(false,'No se pudo conectar con Supabase');
+    if(showMessage) alert('No se pudo sincronizar. Revisa tu conexión a Internet.');
+  }finally{loading=false}
+}
+
+async function offerLocalMigration(){
+  if(refs.length) return;
+  let localRefs=[], localMovs=[];
+  try{
+    localRefs=JSON.parse(localStorage.getItem('erp_refs')||'[]');
+    localMovs=JSON.parse(localStorage.getItem('erp_movs')||'[]');
+  }catch(e){}
+  if(!localRefs.length) return;
+  if(!confirm('Encontré datos guardados en este navegador. ¿Quieres subirlos a la base en línea para usarlos también en otros dispositivos?')) return;
+  try{
+    const payload=localRefs.map(r=>({
+      codigo:String(r.codigo||''),
+      nombre:String(r.nombre||''),
+      cantidad:Number(r.cantidad||0),
+      stock_minimo:Number(r.stock_minimo??5),
+      equipo:String(r.linea||r.equipo||'')
+    })).filter(r=>r.codigo&&r.nombre&&r.equipo);
+    if(payload.length){
+      await api('refacciones',{
+        method:'POST',
+        headers:{'Prefer':'return=representation'},
+        body:JSON.stringify(payload)
+      });
+    }
+    localStorage.removeItem('erp_refs');
+    localStorage.removeItem('erp_movs');
+    await refreshFromCloud();
+    alert('Los datos locales fueron subidos correctamente.');
+  }catch(e){
+    console.error(e);
+    alert('No se pudieron subir los datos locales.');
+  }
+}
+
+async function init(){
+  equipmentMenu.innerHTML=EQUIPOS.map(e=>`<button class="navbtn" onclick="showEquipment('${e.replaceAll("'","\'")}')">⚙ ${e}</button>`).join('');
+  [linea,movEquipo].forEach(s=>s.innerHTML='<option value="">Seleccione</option>'+EQUIPOS.map(e=>`<option>${e}</option>`).join(''));
+  filterEquipment.innerHTML='<option value="">Todos los equipos</option>'+EQUIPOS.map(e=>`<option>${e}</option>`).join('');
+  renderAll();
+  await refreshFromCloud();
+}
+
 function toggleMenu(){sidebar.classList.toggle('open')}
-function showPage(id,btn){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('.navbtn').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active');sidebar.classList.remove('open');if(id==='movimientos')fillMovementRefs();}
+function showPage(id,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.navbtn').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  sidebar.classList.remove('open');
+  if(id==='movimientos')fillMovementRefs();
+}
 function showEquipment(e){currentEquipment=e;equipmentTitle.textContent=e;showPage('equipo');renderEquipment();}
-function notice(id,msg,good=true){let n=document.getElementById(id);n.textContent=msg;n.className='notice show '+(good?'good':'bad');setTimeout(()=>n.classList.remove('show'),3000)}
-function saveRef(ev){ev.preventDefault();let id=editId.value;let data={codigo:codigo.value.trim(),nombre:nombre.value.trim(),cantidad:+cantidad.value,stock_minimo:5,linea:linea.value};
- if(id){let r=refs.find(x=>x.id==id);Object.assign(r,data);notice('invNotice','Refacción actualizada correctamente.');}
- else{data.id=Date.now();refs.push(data);notice('invNotice','Refacción registrada correctamente.');}
- persist();refForm.reset();editId.value='';saveBtn.textContent='Registrar';renderAll();
+function notice(id,msg,good=true){
+  let n=document.getElementById(id);n.textContent=msg;n.className='notice show '+(good?'good':'bad');
+  setTimeout(()=>n.classList.remove('show'),3000)
 }
-function editRef(id){let r=refs.find(x=>x.id==id);if(!r)return;editId.value=r.id;codigo.value=r.codigo;nombre.value=r.nombre;cantidad.value=r.cantidad;linea.value=r.linea;saveBtn.textContent='Guardar cambios';window.scrollTo({top:0,behavior:'smooth'});}
-function deleteRef(id){if(!confirm('¿Eliminar esta refacción?'))return;refs=refs.filter(x=>x.id!=id);persist();renderAll();}
+
+async function saveRef(ev){
+  ev.preventDefault();
+  const id=editId.value;
+  const data={
+    codigo:codigo.value.trim(),
+    nombre:nombre.value.trim(),
+    cantidad:+cantidad.value,
+    stock_minimo:5,
+    equipo:linea.value
+  };
+  try{
+    if(id){
+      await api(`refacciones?id=eq.${encodeURIComponent(id)}`,{
+        method:'PATCH',
+        headers:{'Prefer':'return=minimal'},
+        body:JSON.stringify(data)
+      });
+      notice('invNotice','Refacción actualizada correctamente.');
+    }else{
+      await api('refacciones',{
+        method:'POST',
+        headers:{'Prefer':'return=minimal'},
+        body:JSON.stringify(data)
+      });
+      notice('invNotice','Refacción registrada correctamente.');
+    }
+    refForm.reset();editId.value='';saveBtn.textContent='Registrar';
+    await refreshFromCloud();
+  }catch(e){
+    console.error(e);
+    notice('invNotice','No se pudo guardar la refacción.',false);
+  }
+}
+
+function editRef(id){
+  let r=refs.find(x=>String(x.id)===String(id));if(!r)return;
+  editId.value=r.id;codigo.value=r.codigo;nombre.value=r.nombre;cantidad.value=r.cantidad;linea.value=r.linea;
+  saveBtn.textContent='Guardar cambios';window.scrollTo({top:0,behavior:'smooth'});
+}
+
+async function deleteRef(id){
+  if(!confirm('¿Eliminar esta refacción? También se eliminarán sus movimientos relacionados.'))return;
+  try{
+    await api(`refacciones?id=eq.${encodeURIComponent(id)}`,{method:'DELETE'});
+    await refreshFromCloud();
+  }catch(e){console.error(e);alert('No se pudo eliminar la refacción.')}
+}
+
 function status(r){return +r.cantidad<=+(r.stock_minimo??5)?['Stock bajo','bred']:['Disponible','bgreen']}
-function renderInventory(){let q=(invSearch.value||'').toLowerCase(),eq=filterEquipment.value,st=filterStatus.value;let arr=refs.filter(r=>(!q||[r.codigo,r.nombre,r.linea].some(v=>String(v).toLowerCase().includes(q)))&&(!eq||r.linea===eq)&&(!st||(st==='low'?r.cantidad<=r.stock_minimo:r.cantidad>r.stock_minimo)));
- inventoryBody.innerHTML=arr.length?arr.sort((a,b)=>String(a.codigo).localeCompare(String(b.codigo))).map(r=>{let s=status(r);return `<tr><td>${esc(r.codigo)}</td><td><b>${esc(r.nombre)}</b></td><td>${r.cantidad}</td><td>${r.stock_minimo}</td><td>${esc(r.linea)}</td><td><span class="badge ${s[1]}">${s[0]}</span></td><td><div class="actions"><button class="btn secondary" onclick="editRef(${r.id})">Editar</button><button class="btn danger" onclick="deleteRef(${r.id})">Eliminar</button></div></td></tr>`}).join(''):'<tr><td colspan="7" class="empty">No hay refacciones registradas.</td></tr>';
+
+function renderInventory(){
+  let q=(invSearch.value||'').toLowerCase(),eq=filterEquipment.value,st=filterStatus.value;
+  let arr=refs.filter(r=>(!q||[r.codigo,r.nombre,r.linea].some(v=>String(v).toLowerCase().includes(q)))&&(!eq||r.linea===eq)&&(!st||(st==='low'?r.cantidad<=r.stock_minimo:r.cantidad>r.stock_minimo)));
+  inventoryBody.innerHTML=arr.length?arr.sort((a,b)=>String(a.codigo).localeCompare(String(b.codigo))).map(r=>{
+    let s=status(r);
+    return `<tr><td>${esc(r.codigo)}</td><td><b>${esc(r.nombre)}</b></td><td>${r.cantidad}</td><td>${r.stock_minimo}</td><td>${esc(r.linea)}</td><td><span class="badge ${s[1]}">${s[0]}</span></td><td><div class="actions"><button class="btn secondary" onclick="editRef('${r.id}')">Editar</button><button class="btn danger" onclick="deleteRef('${r.id}')">Eliminar</button></div></td></tr>`
+  }).join(''):'<tr><td colspan="7" class="empty">No hay refacciones registradas.</td></tr>';
 }
-function renderEquipment(){let arr=refs.filter(r=>r.linea===currentEquipment);equipmentBody.innerHTML=arr.length?arr.map(r=>{let s=status(r);return `<tr><td>${esc(r.codigo)}</td><td><b>${esc(r.nombre)}</b></td><td>${r.cantidad}</td><td>${r.stock_minimo}</td><td><span class="badge ${s[1]}">${s[0]}</span></td></tr>`}).join(''):'<tr><td colspan="5" class="empty">No hay refacciones para este equipo.</td></tr>'}
-function fillMovementRefs(){let e=movEquipo.value;let arr=refs.filter(r=>!e||r.linea===e);movRef.innerHTML='<option value="">Seleccione</option>'+arr.map(r=>`<option value="${r.id}">${esc(r.codigo)} - ${esc(r.nombre)}</option>`).join('')}
-function saveMovement(ev){ev.preventDefault();let r=refs.find(x=>x.id==movRef.value),qty=+movCantidad.value,t=movTipo.value;if(!r)return;if(t==='salida'&&qty>r.cantidad){notice('movNotice','No hay suficiente existencia para realizar la salida.',false);return}r.cantidad+=t==='entrada'?qty:-qty;movs.unshift({id:Date.now(),refaccion_id:r.id,codigo:r.codigo,nombre:r.nombre,tipo:t,cantidad:qty,linea:movEquipo.value,fecha:new Date().toLocaleString('es-MX')});persist();movCantidad.value='';notice('movNotice','Movimiento registrado correctamente.');renderAll();}
-function deleteMov(id){if(!confirm('¿Eliminar este movimiento? Esta acción NO revierte el stock.'))return;movs=movs.filter(m=>m.id!=id);persist();renderAll();}
-function renderMovements(){movementBody.innerHTML=movs.length?movs.map(m=>`<tr><td>${String(m.id).slice(-6)}</td><td><b>${esc(m.codigo)} - ${esc(m.nombre)}</b></td><td><span class="badge ${m.tipo==='entrada'?'bgreen':'bred'}">${m.tipo[0].toUpperCase()+m.tipo.slice(1)}</span></td><td>${esc(m.linea)}</td><td><b>${m.tipo==='entrada'?'+':'-'}${m.cantidad}</b></td><td>${esc(m.fecha)}</td><td><button class="btn danger" onclick="deleteMov(${m.id})">Eliminar</button></td></tr>`).join(''):'<tr><td colspan="7" class="empty">No hay movimientos registrados.</td></tr>'}
-function renderDashboard(){let total=refs.length,pieces=refs.reduce((a,r)=>a+(+r.cantidad||0),0),low=refs.filter(r=>r.cantidad<=r.stock_minimo).length,ok=total-low,level=total?Math.round(ok/total*100):0;kTotalRefs.textContent=total;kTotalPieces.textContent=pieces;kLow.textContent=low;kLevel.textContent=level+'%';
- gauges.innerHTML=EQUIPOS.map(e=>{let a=refs.filter(r=>r.linea===e),o=a.filter(r=>r.cantidad>r.stock_minimo).length,p=a.length?Math.round(o/a.length*100):0;return `<div class="gauge"><b>${e}</b><div class="bar"><span style="width:${p}%"></span></div><strong>${p}%</strong><div class="small muted">${o} disponibles de ${a.length}</div></div>`}).join('');
- let lows=refs.filter(r=>r.cantidad<=r.stock_minimo).sort((a,b)=>a.cantidad-b.cantidad);lowStockList.innerHTML=lows.length?lows.map(r=>`<div style="padding:9px 0;border-bottom:1px solid var(--border)"><b>${esc(r.codigo)} - ${esc(r.nombre)}</b> · ${esc(r.linea)} · <span style="color:var(--red)">Existencia: ${r.cantidad}</span></div>`).join(''):'<div class="empty">No hay alertas de stock bajo.</div>';
+
+function renderEquipment(){
+  let arr=refs.filter(r=>r.linea===currentEquipment);
+  equipmentBody.innerHTML=arr.length?arr.map(r=>{
+    let s=status(r);return `<tr><td>${esc(r.codigo)}</td><td><b>${esc(r.nombre)}</b></td><td>${r.cantidad}</td><td>${r.stock_minimo}</td><td><span class="badge ${s[1]}">${s[0]}</span></td></tr>`
+  }).join(''):'<tr><td colspan="5" class="empty">No hay refacciones para este equipo.</td></tr>'
 }
+
+function fillMovementRefs(){
+  let e=movEquipo.value;
+  let arr=refs.filter(r=>!e||r.linea===e);
+  movRef.innerHTML='<option value="">Seleccione</option>'+arr.map(r=>`<option value="${r.id}">${esc(r.codigo)} - ${esc(r.nombre)}</option>`).join('')
+}
+
+async function saveMovement(ev){
+  ev.preventDefault();
+  let r=refs.find(x=>String(x.id)===String(movRef.value)),qty=+movCantidad.value,t=movTipo.value;
+  if(!r)return;
+  if(t==='salida'&&qty>r.cantidad){
+    notice('movNotice','No hay suficiente existencia para realizar la salida.',false);return
+  }
+  const nuevaCantidad = t==='entrada' ? Number(r.cantidad)+qty : Number(r.cantidad)-qty;
+  try{
+    // Actualiza el stock y registra el movimiento en la base compartida.
+    await api(`refacciones?id=eq.${encodeURIComponent(r.id)}`,{
+      method:'PATCH',
+      headers:{'Prefer':'return=minimal'},
+      body:JSON.stringify({cantidad:nuevaCantidad})
+    });
+    try{
+      await api('movimientos',{
+        method:'POST',
+        headers:{'Prefer':'return=minimal'},
+        body:JSON.stringify({
+          refaccion_id:r.id,
+          tipo:t,
+          cantidad:qty,
+          equipo:movEquipo.value
+        })
+      });
+    }catch(movErr){
+      // Si falla el historial, restaura el stock anterior.
+      await api(`refacciones?id=eq.${encodeURIComponent(r.id)}`,{
+        method:'PATCH',
+        headers:{'Prefer':'return=minimal'},
+        body:JSON.stringify({cantidad:Number(r.cantidad)})
+      });
+      throw movErr;
+    }
+    movCantidad.value='';
+    notice('movNotice','Movimiento registrado correctamente.');
+    await refreshFromCloud();
+  }catch(e){
+    console.error(e);
+    notice('movNotice','No se pudo registrar el movimiento.',false);
+  }
+}
+
+async function deleteMov(id){
+  if(!confirm('¿Eliminar este movimiento? Esta acción NO revierte el stock.'))return;
+  try{
+    await api(`movimientos?id=eq.${encodeURIComponent(id)}`,{method:'DELETE'});
+    await refreshFromCloud();
+  }catch(e){console.error(e);alert('No se pudo eliminar el movimiento.')}
+}
+
+function renderMovements(){
+  movementBody.innerHTML=movs.length?movs.map(m=>`<tr><td>${String(m.id).slice(-6)}</td><td><b>${esc(m.codigo)} - ${esc(m.nombre)}</b></td><td><span class="badge ${m.tipo==='entrada'?'bgreen':'bred'}">${m.tipo[0].toUpperCase()+m.tipo.slice(1)}</span></td><td>${esc(m.linea)}</td><td><b>${m.tipo==='entrada'?'+':'-'}${m.cantidad}</b></td><td>${esc(m.fecha)}</td><td><button class="btn danger" onclick="deleteMov('${m.id}')">Eliminar</button></td></tr>`).join(''):'<tr><td colspan="7" class="empty">No hay movimientos registrados.</td></tr>'
+}
+
+function renderDashboard(){
+  let total=refs.length,pieces=refs.reduce((a,r)=>a+(+r.cantidad||0),0),low=refs.filter(r=>r.cantidad<=r.stock_minimo).length,ok=total-low,level=total?Math.round(ok/total*100):0;
+  kTotalRefs.textContent=total;kTotalPieces.textContent=pieces;kLow.textContent=low;kLevel.textContent=level+'%';
+  gauges.innerHTML=EQUIPOS.map(e=>{
+    let a=refs.filter(r=>r.linea===e),o=a.filter(r=>r.cantidad>r.stock_minimo).length,p=a.length?Math.round(o/a.length*100):0;
+    return `<div class="gauge"><b>${e}</b><div class="bar"><span style="width:${p}%"></span></div><strong>${p}%</strong><div class="small muted">${o} disponibles de ${a.length}</div></div>`
+  }).join('');
+  let lows=refs.filter(r=>r.cantidad<=r.stock_minimo).sort((a,b)=>a.cantidad-b.cantidad);
+  lowStockList.innerHTML=lows.length?lows.map(r=>`<div style="padding:9px 0;border-bottom:1px solid var(--border)"><b>${esc(r.codigo)} - ${esc(r.nombre)}</b> · ${esc(r.linea)} · <span style="color:var(--red)">Existencia: ${r.cantidad}</span></div>`).join(''):'<div class="empty">No hay alertas de stock bajo.</div>';
+}
+
 function renderAll(){renderDashboard();renderInventory();renderMovements();renderEquipment();fillMovementRefs();}
-function globalSearch(){let q=globalSearch.value.trim();showPage('inventario',document.querySelector('[data-page="inventario"]'));invSearch.value=q;renderInventory();}
-function exportData(){let blob=new Blob([JSON.stringify({version:1,fecha:new Date().toISOString(),refacciones:refs,movimientos:movs},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='respaldo-erp-refacciones.json';a.click();URL.revokeObjectURL(a.href)}
-function importData(ev){let f=ev.target.files[0];if(!f)return;let rd=new FileReader();rd.onload=()=>{try{let d=JSON.parse(rd.result);if(!Array.isArray(d.refacciones)||!Array.isArray(d.movimientos))throw 0;if(confirm('Esto reemplazará los datos guardados en este dispositivo. ¿Continuar?')){refs=d.refacciones;movs=d.movimientos;persist();renderAll();alert('Respaldo importado correctamente.')}}catch(e){alert('El archivo no es un respaldo válido.')}};rd.readAsText(f);ev.target.value=''}
+
+function globalSearch(){
+  let q=globalSearch.value.trim();
+  showPage('inventario',document.querySelector('[data-page="inventario"]'));
+  invSearch.value=q;renderInventory();
+}
+
+function exportData(){
+  let blob=new Blob([JSON.stringify({version:2,fecha:new Date().toISOString(),refacciones:refs,movimientos:movs},null,2)],{type:'application/json'}),
+      a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download='respaldo-erp-refacciones.json';a.click();URL.revokeObjectURL(a.href)
+}
+
+async function importData(ev){
+  let f=ev.target.files[0];if(!f)return;
+  let rd=new FileReader();
+  rd.onload=async()=>{
+    try{
+      let d=JSON.parse(rd.result);
+      if(!Array.isArray(d.refacciones))throw 0;
+      if(!confirm('Esto agregará las refacciones del respaldo a la base en línea. ¿Continuar?'))return;
+      const payload=d.refacciones.map(r=>({
+        codigo:String(r.codigo||''),
+        nombre:String(r.nombre||''),
+        cantidad:Number(r.cantidad||0),
+        stock_minimo:Number(r.stock_minimo??5),
+        equipo:String(r.linea||r.equipo||'')
+      })).filter(r=>r.codigo&&r.nombre&&r.equipo);
+      if(payload.length) await api('refacciones',{method:'POST',headers:{'Prefer':'return=minimal'},body:JSON.stringify(payload)});
+      await refreshFromCloud();
+      alert('Respaldo importado correctamente.');
+    }catch(e){
+      console.error(e);alert('El archivo no es un respaldo válido o no pudo importarse.');
+    }
+  };
+  rd.readAsText(f);ev.target.value=''
+}
+
 init();
 </script>
+
 </body></html>

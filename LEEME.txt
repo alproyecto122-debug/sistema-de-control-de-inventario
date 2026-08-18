@@ -1,12 +1,15 @@
-ERP REFACCIONES - VERSIÓN PORTABLE
+ERP REFACCIONES - VERSIÓN CON SUPABASE
 
-1. Abre index.html con doble clic.
-2. No requiere Laragon, PHP, MySQL, Railway ni Render.
-3. Los datos se guardan en el navegador del dispositivo mediante almacenamiento local.
-4. Usa "Exportar respaldo" para guardar una copia JSON de tus datos.
-5. Usa "Importar respaldo" para recuperar o trasladar los datos a otro navegador/dispositivo.
+Esta versión:
+- Funciona en GitHub Pages.
+- No requiere Laragon, PHP, MySQL, Railway ni Render.
+- Guarda inventario y movimientos en Supabase.
+- PC, celular y tablet comparten los mismos datos.
+- Requiere conexión a Internet.
 
-IMPORTANTE:
-- Si abres el archivo en otro celular o computadora, los datos NO se sincronizan automáticamente.
-- Para que todos los dispositivos compartan el mismo inventario en tiempo real se necesita una base de datos en línea.
-- Esta versión conserva las funciones principales: Dashboard, inventario, equipos, movimientos, stock mínimo, alertas, búsqueda, edición y eliminación.
+PARA ACTUALIZAR GITHUB:
+1. Abre tu repositorio sistema-de-control-de-inventario.
+2. Abre index.html.
+3. Reemplaza el archivo actual por este index.html (o elimina/sube el nuevo).
+4. Haz Commit changes.
+5. Espera 1-2 minutos a que GitHub Pages se actualice.
