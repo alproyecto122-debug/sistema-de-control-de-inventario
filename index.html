@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ERP Refacciones</title>
+<style>
+:root{--nav:#1f2937;--nav2:#111827;--bg:#f4f6f9;--card:#fff;--text:#1f2937;--muted:#6b7280;--blue:#2563eb;--red:#dc2626;--green:#16a34a;--border:#e5e7eb}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text)}
+.app{min-height:100vh}.top{height:58px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;padding:8px 16px;position:sticky;top:0;z-index:10}
+.menuBtn{display:none;border:0;background:none;font-size:26px}.brandTop{font-weight:700}.search{margin-left:auto;display:flex;max-width:520px;width:50%}.search input{flex:1;padding:10px;border:1px solid #cbd5e1;border-radius:8px 0 0 8px}.search button{border:0;background:var(--blue);color:#fff;padding:0 16px;border-radius:0 8px 8px 0}
+.sidebar{position:fixed;top:58px;bottom:0;width:245px;background:var(--nav2);color:#fff;padding:18px 12px;overflow:auto}.sidebrand{font-size:20px;font-weight:700;padding:8px 12px 18px}.navbtn{width:100%;display:flex;align-items:center;gap:10px;background:none;border:0;color:#d1d5db;padding:11px 12px;border-radius:7px;text-align:left;font-size:15px;cursor:pointer}.navbtn:hover,.navbtn.active{background:#374151;color:#fff}.group{margin:8px 0}.groupTitle{font-size:12px;color:#9ca3af;padding:10px 12px 4px;text-transform:uppercase}
+.main{margin-left:245px;padding:24px}.page{display:none}.page.active{display:block}
+.header{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:22px}.header h1{margin:0;font-size:28px}.sub{color:var(--muted);margin-top:5px}.status{background:#fff;padding:12px 16px;border-radius:10px;box-shadow:0 3px 12px #0000000d}.ok{color:var(--green);font-weight:700}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.kpi,.card{background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 4px 14px #0000000b}.kpi{padding:18px}.kpi .n{font-size:30px;font-weight:700;margin:8px 0}.muted{color:var(--muted)}
+.card{margin-top:18px;overflow:hidden}.cardhead{padding:16px 18px;border-bottom:1px solid var(--border);font-weight:700}.cardbody{padding:18px}
+.gauges{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.gauge{border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center}.bar{height:9px;background:#e5e7eb;border-radius:9px;overflow:hidden;margin:10px 0}.bar span{display:block;height:100%;background:var(--blue)}
+.formgrid{display:grid;grid-template-columns:1fr 2fr 1fr 1.4fr auto;gap:10px;align-items:end}.field label{display:block;font-weight:600;font-size:14px;margin-bottom:6px}.field input,.field select{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:7px;background:#fff}
+.btn{border:0;border-radius:7px;padding:10px 13px;cursor:pointer;font-weight:600}.primary{background:var(--blue);color:#fff}.danger{background:var(--red);color:#fff}.secondary{background:#e5e7eb}.success{background:var(--green);color:#fff}
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}.filters select,.filters input{padding:9px;border:1px solid #cbd5e1;border-radius:7px}
+.tablewrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:760px}th,td{padding:11px 10px;border-bottom:1px solid var(--border);text-align:left}th{background:#1f2937;color:#fff}.badge{display:inline-block;padding:5px 8px;border-radius:999px;font-size:12px;font-weight:700}.bgreen{background:#dcfce7;color:#166534}.bred{background:#fee2e2;color:#991b1b}.actions{display:flex;gap:6px}.empty{text-align:center;color:var(--muted);padding:24px}
+.notice{padding:12px;border-radius:8px;margin-bottom:12px;display:none}.notice.show{display:block}.notice.good{background:#dcfce7;color:#166534}.notice.bad{background:#fee2e2;color:#991b1b}
+.small{font-size:13px}.footerNote{margin-top:18px;color:var(--muted);font-size:12px}
+@media(max-width:900px){.grid4,.gauges{grid-template-columns:repeat(2,1fr)}.formgrid{grid-template-columns:1fr 1fr}.formgrid .wide{grid-column:span 2}}
+@media(max-width:700px){.menuBtn{display:block}.brandTop{display:none}.search{width:100%;margin-left:0}.sidebar{transform:translateX(-100%);transition:.2s;z-index:20}.sidebar.open{transform:translateX(0)}.main{margin-left:0;padding:14px}.grid4,.gauges{grid-template-columns:1fr}.header{align-items:flex-start;flex-direction:column}.status{width:100%}.formgrid{grid-template-columns:1fr}.formgrid .wide{grid-column:auto}.header h1{font-size:23px}}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="top"><button class="menuBtn" onclick="toggleMenu()">☰</button><div class="brandTop">ERP Refacciones</div><div class="search"><input id="globalSearch" placeholder="Buscar código, nombre o equipo"><button onclick="globalSearch()">Buscar</button></div></header>
+<aside class="sidebar" id="sidebar">
+<div class="sidebrand">⚙ ERP Refacciones</div>
+<button class="navbtn active" data-page="dashboard" onclick="showPage('dashboard',this)">▦ Dashboard</button>
+<button class="navbtn" data-page="inventario" onclick="showPage('inventario',this)">▤ Inventario general</button>
+<div class="group"><div class="groupTitle">Equipos</div><div id="equipmentMenu"></div></div>
+<button class="navbtn" data-page="movimientos" onclick="showPage('movimientos',this)">⇄ Movimientos</button>
+<div class="group"><div class="groupTitle">Datos</div>
+<button class="navbtn" onclick="exportData()">⬇ Exportar respaldo</button>
+<button class="navbtn" onclick="document.getElementById('importFile').click()">⬆ Importar respaldo</button>
+<input id="importFile" type="file" accept=".json" hidden onchange="importData(event)">
+</div>
+</aside>
+<main class="main">
+<section class="page active" id="dashboard">
+<div class="header"><div><h1>Dashboard</h1><div class="sub">Control de inventario de refacciones por equipo</div></div><div class="status">Estado: <span class="ok">● Disponible</span><div class="small muted">Datos guardados en este dispositivo</div></div></div>
+<div class="grid4">
+<div class="kpi"><div>📦 Refacciones</div><div class="n" id="kTotalRefs">0</div><div class="muted">Registros totales</div></div>
+<div class="kpi"><div>🔩 Piezas</div><div class="n" id="kTotalPieces">0</div><div class="muted">Existencias totales</div></div>
+<div class="kpi"><div>⚠ Stock bajo</div><div class="n" id="kLow">0</div><div class="muted">Requieren seguimiento</div></div>
+<div class="kpi"><div>📊 Nivel</div><div class="n" id="kLevel">0%</div><div class="muted">Refacciones disponibles</div></div>
+</div>
+<div class="card"><div class="cardhead">Medidores por equipo</div><div class="cardbody"><div class="gauges" id="gauges"></div></div></div>
+<div class="card"><div class="cardhead">Notificaciones de stock bajo</div><div class="cardbody"><div id="lowStockList"></div></div></div>
+</section>
+
+<section class="page" id="inventario">
+<div class="header"><div><h1>Inventario de Refacciones</h1><div class="sub">Registro, edición y consulta del inventario</div></div></div>
+<div id="invNotice" class="notice"></div>
+<div class="card"><div class="cardhead">Registro de refacciones</div><div class="cardbody">
+<form id="refForm" onsubmit="saveRef(event)"><input type="hidden" id="editId">
+<div class="formgrid">
+<div class="field"><label>Código</label><input id="codigo" required></div>
+<div class="field wide"><label>Nombre</label><input id="nombre" required></div>
+<div class="field"><label>Cantidad</label><input id="cantidad" type="number" min="0" required></div>
+<div class="field"><label>Equipo</label><select id="linea" required></select></div>
+<button class="btn primary" type="submit" id="saveBtn">Registrar</button>
+</div></form></div></div>
+<div class="card"><div class="cardhead">Inventario general</div><div class="cardbody">
+<div class="filters"><input id="invSearch" placeholder="Buscar..." oninput="renderInventory()"><select id="filterEquipment" onchange="renderInventory()"><option value="">Todos los equipos</option></select><select id="filterStatus" onchange="renderInventory()"><option value="">Todos los estados</option><option value="low">Stock bajo</option><option value="ok">Disponible</option></select></div>
+<div class="tablewrap"><table><thead><tr><th>Código</th><th>Nombre</th><th>Cantidad</th><th>Stock mínimo</th><th>Equipo</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="inventoryBody"></tbody></table></div>
+</div></div></section>
+
+<section class="page" id="equipo"><div class="header"><div><h1 id="equipmentTitle">Equipo</h1><div class="sub">Refacciones asociadas al equipo seleccionado</div></div></div><div class="card"><div class="cardbody"><div class="tablewrap"><table><thead><tr><th>Código</th><th>Nombre</th><th>Cantidad</th><th>Stock mínimo</th><th>Estado</th></tr></thead><tbody id="equipmentBody"></tbody></table></div></div></div></section>
+
+<section class="page" id="movimientos">
+<div class="header"><div><h1>Movimientos de Inventario</h1><div class="sub">Registro de entradas y salidas</div></div></div>
+<div id="movNotice" class="notice"></div>
+<div class="card"><div class="cardbody"><form onsubmit="saveMovement(event)"><div class="formgrid">
+<div class="field"><label>Equipo</label><select id="movEquipo" onchange="fillMovementRefs()" required></select></div>
+<div class="field wide"><label>Refacción</label><select id="movRef" required></select></div>
+<div class="field"><label>Tipo</label><select id="movTipo"><option value="entrada">Entrada</option><option value="salida">Salida</option></select></div>
+<div class="field"><label>Cantidad</label><input id="movCantidad" type="number" min="1" required></div>
+<button class="btn primary">Registrar</button></div></form></div></div>
+<div class="card"><div class="cardhead">Historial</div><div class="cardbody"><div class="tablewrap"><table><thead><tr><th>ID</th><th>Refacción</th><th>Tipo</th><th>Equipo</th><th>Cantidad</th><th>Fecha</th><th>Acciones</th></tr></thead><tbody id="movementBody"></tbody></table></div></div></div>
+</section>
+<div class="footerNote">Versión portable: no requiere Laragon, PHP, MySQL, Railway ni Render. Para compartir los mismos datos entre varios dispositivos se necesitaría una base de datos en línea.</div>
+</main></div>
+<script>
+const EQUIPOS=['Tratamiento','Placas','Bandas Cargadoras','Bandas Collet','Etiquetadoras','Motor','Reductor','Plataformas'];
+let refs=JSON.parse(localStorage.getItem('erp_refs')||'[]');
+let movs=JSON.parse(localStorage.getItem('erp_movs')||'[]');
+let currentEquipment='';
+function persist(){localStorage.setItem('erp_refs',JSON.stringify(refs));localStorage.setItem('erp_movs',JSON.stringify(movs));}
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+function init(){
+ equipmentMenu.innerHTML=EQUIPOS.map(e=>`<button class="navbtn" onclick="showEquipment('${e.replaceAll("'","\\'")}')">⚙ ${e}</button>`).join('');
+ [linea,movEquipo].forEach(s=>s.innerHTML='<option value="">Seleccione</option>'+EQUIPOS.map(e=>`<option>${e}</option>`).join(''));
+ filterEquipment.innerHTML='<option value="">Todos los equipos</option>'+EQUIPOS.map(e=>`<option>${e}</option>`).join('');
+ renderAll();
+}
+function toggleMenu(){sidebar.classList.toggle('open')}
+function showPage(id,btn){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('.navbtn').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active');sidebar.classList.remove('open');if(id==='movimientos')fillMovementRefs();}
+function showEquipment(e){currentEquipment=e;equipmentTitle.textContent=e;showPage('equipo');renderEquipment();}
+function notice(id,msg,good=true){let n=document.getElementById(id);n.textContent=msg;n.className='notice show '+(good?'good':'bad');setTimeout(()=>n.classList.remove('show'),3000)}
+function saveRef(ev){ev.preventDefault();let id=editId.value;let data={codigo:codigo.value.trim(),nombre:nombre.value.trim(),cantidad:+cantidad.value,stock_minimo:5,linea:linea.value};
+ if(id){let r=refs.find(x=>x.id==id);Object.assign(r,data);notice('invNotice','Refacción actualizada correctamente.');}
+ else{data.id=Date.now();refs.push(data);notice('invNotice','Refacción registrada correctamente.');}
+ persist();refForm.reset();editId.value='';saveBtn.textContent='Registrar';renderAll();
+}
+function editRef(id){let r=refs.find(x=>x.id==id);if(!r)return;editId.value=r.id;codigo.value=r.codigo;nombre.value=r.nombre;cantidad.value=r.cantidad;linea.value=r.linea;saveBtn.textContent='Guardar cambios';window.scrollTo({top:0,behavior:'smooth'});}
+function deleteRef(id){if(!confirm('¿Eliminar esta refacción?'))return;refs=refs.filter(x=>x.id!=id);persist();renderAll();}
+function status(r){return +r.cantidad<=+(r.stock_minimo??5)?['Stock bajo','bred']:['Disponible','bgreen']}
+function renderInventory(){let q=(invSearch.value||'').toLowerCase(),eq=filterEquipment.value,st=filterStatus.value;let arr=refs.filter(r=>(!q||[r.codigo,r.nombre,r.linea].some(v=>String(v).toLowerCase().includes(q)))&&(!eq||r.linea===eq)&&(!st||(st==='low'?r.cantidad<=r.stock_minimo:r.cantidad>r.stock_minimo)));
+ inventoryBody.innerHTML=arr.length?arr.sort((a,b)=>String(a.codigo).localeCompare(String(b.codigo))).map(r=>{let s=status(r);return `<tr><td>${esc(r.codigo)}</td><td><b>${esc(r.nombre)}</b></td><td>${r.cantidad}</td><td>${r.stock_minimo}</td><td>${esc(r.linea)}</td><td><span class="badge ${s[1]}">${s[0]}</span></td><td><div class="actions"><button class="btn secondary" onclick="editRef(${r.id})">Editar</button><button class="btn danger" onclick="deleteRef(${r.id})">Eliminar</button></div></td></tr>`}).join(''):'<tr><td colspan="7" class="empty">No hay refacciones registradas.</td></tr>';
+}
+function renderEquipment(){let arr=refs.filter(r=>r.linea===currentEquipment);equipmentBody.innerHTML=arr.length?arr.map(r=>{let s=status(r);return `<tr><td>${esc(r.codigo)}</td><td><b>${esc(r.nombre)}</b></td><td>${r.cantidad}</td><td>${r.stock_minimo}</td><td><span class="badge ${s[1]}">${s[0]}</span></td></tr>`}).join(''):'<tr><td colspan="5" class="empty">No hay refacciones para este equipo.</td></tr>'}
+function fillMovementRefs(){let e=movEquipo.value;let arr=refs.filter(r=>!e||r.linea===e);movRef.innerHTML='<option value="">Seleccione</option>'+arr.map(r=>`<option value="${r.id}">${esc(r.codigo)} - ${esc(r.nombre)}</option>`).join('')}
+function saveMovement(ev){ev.preventDefault();let r=refs.find(x=>x.id==movRef.value),qty=+movCantidad.value,t=movTipo.value;if(!r)return;if(t==='salida'&&qty>r.cantidad){notice('movNotice','No hay suficiente existencia para realizar la salida.',false);return}r.cantidad+=t==='entrada'?qty:-qty;movs.unshift({id:Date.now(),refaccion_id:r.id,codigo:r.codigo,nombre:r.nombre,tipo:t,cantidad:qty,linea:movEquipo.value,fecha:new Date().toLocaleString('es-MX')});persist();movCantidad.value='';notice('movNotice','Movimiento registrado correctamente.');renderAll();}
+function deleteMov(id){if(!confirm('¿Eliminar este movimiento? Esta acción NO revierte el stock.'))return;movs=movs.filter(m=>m.id!=id);persist();renderAll();}
+function renderMovements(){movementBody.innerHTML=movs.length?movs.map(m=>`<tr><td>${String(m.id).slice(-6)}</td><td><b>${esc(m.codigo)} - ${esc(m.nombre)}</b></td><td><span class="badge ${m.tipo==='entrada'?'bgreen':'bred'}">${m.tipo[0].toUpperCase()+m.tipo.slice(1)}</span></td><td>${esc(m.linea)}</td><td><b>${m.tipo==='entrada'?'+':'-'}${m.cantidad}</b></td><td>${esc(m.fecha)}</td><td><button class="btn danger" onclick="deleteMov(${m.id})">Eliminar</button></td></tr>`).join(''):'<tr><td colspan="7" class="empty">No hay movimientos registrados.</td></tr>'}
+function renderDashboard(){let total=refs.length,pieces=refs.reduce((a,r)=>a+(+r.cantidad||0),0),low=refs.filter(r=>r.cantidad<=r.stock_minimo).length,ok=total-low,level=total?Math.round(ok/total*100):0;kTotalRefs.textContent=total;kTotalPieces.textContent=pieces;kLow.textContent=low;kLevel.textContent=level+'%';
+ gauges.innerHTML=EQUIPOS.map(e=>{let a=refs.filter(r=>r.linea===e),o=a.filter(r=>r.cantidad>r.stock_minimo).length,p=a.length?Math.round(o/a.length*100):0;return `<div class="gauge"><b>${e}</b><div class="bar"><span style="width:${p}%"></span></div><strong>${p}%</strong><div class="small muted">${o} disponibles de ${a.length}</div></div>`}).join('');
+ let lows=refs.filter(r=>r.cantidad<=r.stock_minimo).sort((a,b)=>a.cantidad-b.cantidad);lowStockList.innerHTML=lows.length?lows.map(r=>`<div style="padding:9px 0;border-bottom:1px solid var(--border)"><b>${esc(r.codigo)} - ${esc(r.nombre)}</b> · ${esc(r.linea)} · <span style="color:var(--red)">Existencia: ${r.cantidad}</span></div>`).join(''):'<div class="empty">No hay alertas de stock bajo.</div>';
+}
+function renderAll(){renderDashboard();renderInventory();renderMovements();renderEquipment();fillMovementRefs();}
+function globalSearch(){let q=globalSearch.value.trim();showPage('inventario',document.querySelector('[data-page="inventario"]'));invSearch.value=q;renderInventory();}
+function exportData(){let blob=new Blob([JSON.stringify({version:1,fecha:new Date().toISOString(),refacciones:refs,movimientos:movs},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='respaldo-erp-refacciones.json';a.click();URL.revokeObjectURL(a.href)}
+function importData(ev){let f=ev.target.files[0];if(!f)return;let rd=new FileReader();rd.onload=()=>{try{let d=JSON.parse(rd.result);if(!Array.isArray(d.refacciones)||!Array.isArray(d.movimientos))throw 0;if(confirm('Esto reemplazará los datos guardados en este dispositivo. ¿Continuar?')){refs=d.refacciones;movs=d.movimientos;persist();renderAll();alert('Respaldo importado correctamente.')}}catch(e){alert('El archivo no es un respaldo válido.')}};rd.readAsText(f);ev.target.value=''}
+init();
+</script>
+</body></html>
