@@ -67,6 +67,7 @@ tbody tr:hover{background:#fbfefc}.badge{display:inline-block;padding:5px 9px;bo
 }
 </style>
 
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 <div class="app">
@@ -497,12 +498,24 @@ function getLowStockRows(){
 function exportLowStockExcel(){
   const rows=getLowStockRows();
   if(!rows.length){ alert('No hay refacciones con stock bajo para exportar.'); return; }
-  const safe=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const body=rows.map(r=>`<tr><td>${safe(r.codigo)}</td><td>${safe(r.nombre)}</td><td>${r.cantidad}</td><td>${r.stock_minimo??5}</td><td>${safe(r.linea||r.equipo||'')}</td><td>${Math.max(0,Number(r.stock_minimo??5)-Number(r.cantidad))}</td></tr>`).join('');
-  const doc=`<html><head><meta charset="utf-8"></head><body><h2>Refacciones con stock bajo</h2><table border="1"><tr><th>Código</th><th>Nombre</th><th>Existencia</th><th>Stock mínimo</th><th>Equipo</th><th>Faltante</th></tr>${body}</table></body></html>`;
-  const blob=new Blob(['\ufeff',doc],{type:'application/vnd.ms-excel;charset=utf-8;'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='stock-bajo-refacciones.xls'; a.click();
-  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  if(typeof XLSX==='undefined'){ alert('No se pudo cargar el módulo de Excel. Revisa tu conexión a Internet.'); return; }
+
+  const data=rows.map(r=>({
+    "Código": r.codigo,
+    "Nombre": r.nombre,
+    "Existencia": Number(r.cantidad??0),
+    "Stock mínimo": Number(r.stock_minimo??5),
+    "Equipo": r.linea||r.equipo||'',
+    "Faltante para mínimo": Math.max(0,Number(r.stock_minimo??5)-Number(r.cantidad??0))
+  }));
+
+  const ws=XLSX.utils.json_to_sheet(data);
+  ws['!cols']=[
+    {wch:14},{wch:32},{wch:12},{wch:14},{wch:22},{wch:20}
+  ];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Stock bajo');
+  XLSX.writeFile(wb,'stock-bajo-refacciones.xlsx');
 }
 
 function exportLowStockWord(){
@@ -519,69 +532,31 @@ function exportLowStockWord(){
 
 function exportInventoryExcel(){
   if(!refs.length){ alert('No hay refacciones registradas para exportar.'); return; }
+  if(typeof XLSX==='undefined'){ alert('No se pudo cargar el módulo de Excel. Revisa tu conexión a Internet.'); return; }
 
-  const safe=v=>String(v??'')
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;');
-
-  const rows=[...refs]
+  const data=[...refs]
     .sort((a,b)=>String(a.codigo).localeCompare(String(b.codigo)))
     .map(r=>{
       const min=Number(r.stock_minimo??5);
       const qty=Number(r.cantidad??0);
-      const estado=qty<=min?'Stock bajo':'Disponible';
-      const faltante=Math.max(0,min-qty);
-      return `<tr>
-        <td>${safe(r.codigo)}</td>
-        <td>${safe(r.nombre)}</td>
-        <td>${qty}</td>
-        <td>${min}</td>
-        <td>${safe(r.linea||r.equipo||'')}</td>
-        <td>${estado}</td>
-        <td>${faltante}</td>
-      </tr>`;
-    }).join('');
+      return {
+        "Código": r.codigo,
+        "Nombre": r.nombre,
+        "Existencia": qty,
+        "Stock mínimo": min,
+        "Equipo": r.linea||r.equipo||'',
+        "Estado": qty<=min ? "Stock bajo" : "Disponible",
+        "Faltante para mínimo": Math.max(0,min-qty)
+      };
+    });
 
-  const doc=`<!doctype html>
-  <html>
-  <head>
-    <meta charset="utf-8">
-    <style>
-      body{font-family:Arial,sans-serif}
-      h2{margin-bottom:6px}
-      p{margin-top:0;color:#555}
-      table{border-collapse:collapse;width:100%}
-      th,td{border:1px solid #666;padding:7px;text-align:left}
-      th{background:#eaf6ee}
-    </style>
-  </head>
-  <body>
-    <h2>Inventario general de refacciones</h2>
-    <p>Fecha de generación: ${new Date().toLocaleString('es-MX')}</p>
-    <table>
-      <tr>
-        <th>Código</th>
-        <th>Nombre</th>
-        <th>Existencia</th>
-        <th>Stock mínimo</th>
-        <th>Equipo</th>
-        <th>Estado</th>
-        <th>Faltante para mínimo</th>
-      </tr>
-      ${rows}
-    </table>
-  </body>
-  </html>`;
-
-  const blob=new Blob(['\ufeff',doc],{type:'application/vnd.ms-excel;charset=utf-8;'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download='inventario-general-refacciones.xls';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  const ws=XLSX.utils.json_to_sheet(data);
+  ws['!cols']=[
+    {wch:14},{wch:32},{wch:12},{wch:14},{wch:22},{wch:14},{wch:20}
+  ];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Inventario general');
+  XLSX.writeFile(wb,'inventario-general-refacciones.xlsx');
 }
 
 init();
