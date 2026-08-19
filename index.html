@@ -82,8 +82,6 @@ tbody tr:hover{background:#fbfefc}.badge{display:inline-block;padding:5px 9px;bo
 <button class="navbtn" onclick="exportData()">⬇ Exportar respaldo</button>
 <button class="navbtn" onclick="document.getElementById('importFile').click()">⬆ Importar respaldo</button>
 <button class="navbtn" onclick="refreshFromCloud()">↻ Sincronizar ahora</button>
-<button class="navbtn" onclick="exportLowStockExcel()">▤ Exportar stock bajo a Excel</button>
-<button class="navbtn" onclick="exportLowStockWord()">▥ Exportar stock bajo a Word</button>
 <button class="navbtn" onclick="exportInventoryExcel()">▦ Exportar inventario general a Excel</button>
 <input id="importFile" type="file" accept=".json" hidden onchange="importData(event)">
 </div>
@@ -101,8 +99,6 @@ tbody tr:hover{background:#fbfefc}.badge{display:inline-block;padding:5px 9px;bo
 <div class="card"><div class="cardhead">Notificaciones de stock bajo</div>
 <div class="cardbody">
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
-    <button class="btn success" onclick="exportLowStockExcel()">Exportar a Excel</button>
-    <button class="btn secondary" onclick="exportLowStockWord()">Exportar a Word</button>
   </div>
   <div id="lowStockList"></div>
 </div></div>
@@ -495,39 +491,7 @@ function getLowStockRows(){
              .sort((a,b)=>String(a.codigo).localeCompare(String(b.codigo)));
 }
 
-function exportLowStockExcel(){
-  const rows=getLowStockRows();
-  if(!rows.length){ alert('No hay refacciones con stock bajo para exportar.'); return; }
-  if(typeof XLSX==='undefined'){ alert('No se pudo cargar el módulo de Excel. Revisa tu conexión a Internet.'); return; }
 
-  const data=rows.map(r=>({
-    "Código": r.codigo,
-    "Nombre": r.nombre,
-    "Existencia": Number(r.cantidad??0),
-    "Stock mínimo": Number(r.stock_minimo??5),
-    "Equipo": r.linea||r.equipo||'',
-    "Faltante para mínimo": Math.max(0,Number(r.stock_minimo??5)-Number(r.cantidad??0))
-  }));
-
-  const ws=XLSX.utils.json_to_sheet(data);
-  ws['!cols']=[
-    {wch:14},{wch:32},{wch:12},{wch:14},{wch:22},{wch:20}
-  ];
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'Stock bajo');
-  XLSX.writeFile(wb,'stock-bajo-refacciones.xlsx');
-}
-
-function exportLowStockWord(){
-  const rows=getLowStockRows();
-  if(!rows.length){ alert('No hay refacciones con stock bajo para exportar.'); return; }
-  const safe=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const body=rows.map(r=>`<tr><td>${safe(r.codigo)}</td><td>${safe(r.nombre)}</td><td>${r.cantidad}</td><td>${r.stock_minimo??5}</td><td>${safe(r.linea||r.equipo||'')}</td><td>${Math.max(0,Number(r.stock_minimo??5)-Number(r.cantidad))}</td></tr>`).join('');
-  const doc=`<html><head><meta charset="utf-8"><style>body{font-family:Arial}table{border-collapse:collapse;width:100%}th,td{border:1px solid #555;padding:6px}th{background:#eaf6ee}</style></head><body><h1>Refacciones con stock bajo</h1><p>Fecha: ${new Date().toLocaleString('es-MX')}</p><table><tr><th>Código</th><th>Nombre</th><th>Existencia</th><th>Stock mínimo</th><th>Equipo</th><th>Faltante</th></tr>${body}</table></body></html>`;
-  const blob=new Blob(['\ufeff',doc],{type:'application/msword;charset=utf-8;'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='stock-bajo-refacciones.doc'; a.click();
-  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
-}
 
 
 function exportInventoryExcel(){
