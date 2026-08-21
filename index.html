@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ERP Refacciones</title>
+<title>Sistema de Control de Inventario</title>
 
 <style>
 :root{
@@ -22,7 +22,7 @@ button,input,select{font:inherit}.app{min-height:100vh}
 .search button::before{content:"⌕";font-size:24px}
 .top::after{content:"⟳  Sincronizar ahora";padding:12px 16px;border:1px solid #d9dee5;border-radius:12px;font-weight:700;color:#0f172a;background:#fff}
 .sidebar{position:fixed;inset:0 auto 0 0;width:265px;background:linear-gradient(180deg,#003e31 0%,#005541 55%,#003e31 100%);color:#fff;padding:18px 14px 20px;overflow:auto;z-index:40}
-.sidebrand{display:flex;align-items:center;gap:12px;padding:4px 14px 25px;font-size:24px;font-weight:800;line-height:1.05}
+.sidebrand{display:flex;align-items:center;gap:12px;padding:4px 10px 25px;font-size:20px;font-weight:800;line-height:1.12}
 .sidebrand::before{content:"⚙";font-size:42px;color:#5be28b}
 .navbtn{width:100%;border:0;background:transparent;color:#e5f7ef;display:flex;align-items:center;gap:10px;padding:12px 14px;margin:2px 0;border-radius:10px;text-align:left;font-size:15px;font-weight:700;cursor:pointer}
 .navbtn:hover{background:rgba(255,255,255,.08)}.navbtn.active{background:linear-gradient(90deg,#0f7a53,#0b6948);color:#fff}
@@ -71,9 +71,9 @@ tbody tr:hover{background:#fbfefc}.badge{display:inline-block;padding:5px 9px;bo
 </head>
 <body>
 <div class="app">
-<header class="top"><button class="menuBtn" onclick="toggleMenu()">☰</button><div class="brandTop">ERP Refacciones</div><div class="search"><input id="globalSearchInput" placeholder="Buscar código, nombre o equipo" onkeydown="if(event.key==='Enter'){event.preventDefault();runGlobalSearch();}"><button onclick="runGlobalSearch()">Buscar</button></div></header>
+<header class="top"><button class="menuBtn" onclick="toggleMenu()">☰</button><div class="brandTop">Sistema de Control de Inventario</div><div class="search"><input id="globalSearchInput" placeholder="Buscar código, nombre o equipo" onkeydown="if(event.key==='Enter'){event.preventDefault();runGlobalSearch();}"><button onclick="runGlobalSearch()">Buscar</button></div></header>
 <aside class="sidebar" id="sidebar">
-<div class="sidebrand">ERP<br>Refacciones</div>
+<div class="sidebrand">Sistema de Control<br>de Inventario</div>
 <button class="navbtn active" data-page="dashboard" onclick="showPage('dashboard',this)">⌂ Dashboard</button>
 <button class="navbtn" data-page="inventario" onclick="showPage('inventario',this)">▣ Inventario general</button>
 <div class="group"><div class="groupTitle">Equipos</div><div id="equipmentMenu"></div></div>
@@ -161,7 +161,7 @@ tbody tr:hover{background:#fbfefc}.badge{display:inline-block;padding:5px 9px;bo
 const SUPABASE_URL='https://mdrwistpblqrwczzukhf.supabase.co';
 const SUPABASE_KEY='sb_publishable_yxCAfanUClZRHU5QiDcGwg_7gfG6wo1';
 
-const EQUIPOS=['Tratamiento','Placas','Bandas Cargadoras','Bandas Collet','Etiquetadoras','Motor','Reductor','Plataformas',
+const EQUIPOS=['Tratamiento','Placas','Bandas Transportadoras','Bandas Collet','Etiquetadoras','Motor','Reductor','Plataformas',
 'Decorado'];
 let refs=[];
 let movs=[];
